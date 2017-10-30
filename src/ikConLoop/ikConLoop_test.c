@@ -76,7 +76,7 @@ void testInitErrors() {
     
     /* -1 for bad setpoint generator parameters */
     ikConLoop_initParams(&params);
-    params.setpointGenerator.preferredControlActionLutblN = -1;
+    params.setpointGenerator.nzones = -1;
     err = ikConLoop_init(&loop, &params);
     if (-1 != err) printf("%%TEST_FAILED%% time=0 testname=testInitErrors (ikConLoop_test) message=init expected to return -1, but it returned %d\n", err);
     
@@ -121,6 +121,8 @@ void testControlActionFeedback() {
     ikConLoop loop;
     /* declare initialisation parameters */
     ikConLoopParams params;
+    /* allocate preferred control action*/
+    double pca; /* here, arbitrarily, we'll manually make pca equal the feedback within the zones, and saturate at the setpoints*/
     
     /* initialise instance */
     ikConLoop_initParams(&params);
@@ -129,6 +131,7 @@ void testControlActionFeedback() {
     params.setpointGenerator.setpoints[1][0] = 1.0;
     params.setpointGenerator.setpoints[0][1] = 2.0;
     params.setpointGenerator.setpoints[1][1] = 4.0;
+    params.setpointGenerator.preferredControlAction = &pca;
     params.linearController.errorTfs.tfParams[0].enable = 1;
     params.linearController.errorTfs.tfParams[0].b[0] = -1;
     err = ikConLoop_init(&loop, &params);
@@ -136,8 +139,10 @@ void testControlActionFeedback() {
     
     /* see that the setpoint generator makes it to the second zone, for which */
     /* adequate control action feedback is needed */
+    pca = 1.0; /* saturated at upper limit of first zone */
     output = ikConLoop_step(&loop, 8.0, 4.0, -256.0, 256.0);
     if (fabs(3.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFeedback (ikConLoop_test) message=step expected to return 3.0, but it returned %f\n", output);
+    pca = 2.0; /* saturated at lower limit of second zone */
     output = ikConLoop_step(&loop, 8.0, 4.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFeedback (ikConLoop_test) message=step expected to return 2.0, but it returned %f\n", output);
     

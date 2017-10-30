@@ -43,24 +43,18 @@ void testInitErrors() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
-
-    /* -1 for bad feedback filtering parameters */
+    
+    /* -3 for invalid hysteresis values */
     ikStpgen_initParams(&params);
-    params.feedbackFilters.gainSchedN = -1;
-    err = ikStpgen_init(&sg, &params);
-    if (-1 != err) printf("%%TEST_FAILED%% time=0 testname=testInitErrors (ikStpgen_test) message=expected init to return -1, but it returned %d\n", err);
-
-    /* -2 for bad control action filtering parameters */
-    ikStpgen_initParams(&params);
-    params.controlActionFilters.gainSchedN = -1;
-    err = ikStpgen_init(&sg, &params);
-    if (-2 != err) printf("%%TEST_FAILED%% time=0 testname=testInitErrors (ikStpgen_test) message=expected init to return -2, but it returned %d\n", err);
-
-    /* -3 for bad look-up table parameters */
-    ikStpgen_initParams(&params);
-    params.preferredControlActionLutblN = -1;
+    params.nzones = 2;
+    params.setpoints[0][0] = 1.0;
+    params.setpoints[1][0] = 2.0;
+    params.setpoints[0][1] = 3.0;
+    params.setpoints[1][1] = 4.0;
+    params.zoneTransitionHysteresis[0] = -0.1;
     err = ikStpgen_init(&sg, &params);
     if (-3 != err) printf("%%TEST_FAILED%% time=0 testname=testInitErrors (ikStpgen_test) message=expected init to return -3, but it returned %d\n", err);
+    ikStpgen_initParams(&params);
 
     /* -4 for invalid zone number */
     ikStpgen_initParams(&params);
@@ -175,8 +169,7 @@ void testDefault() {
     ikStpgenParams params;
 
     /* see that, by default, we get the inputs waved through unmodified to the outputs, */
-    /* that the filters are static unit gains, and that the preferred control action */
-    /* curve is also a unit gain */
+    /* and that the preferred control action is 0.0 */
     ikStpgen_initParams(&params);
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
@@ -197,21 +190,11 @@ void testDefault() {
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected getOutput to return 0 for maximum control action, but it returned %d\n", err);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 2.0 for maximum control action, but it fetched %f\n", output);
-    /* feedback filtering is a unit gain */
-    output = 0.0;
-    err = ikStpgen_getOutput(&sg, &output, "filtered feedback");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected getOutput to return 0 for filtered feedback, but it returned %d\n", err);
-    if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 4.0 for filtered feedback, but it fetched %f\n", output);
-    /* control action filtering is a unit gain */
-    output = 0.0;
-    err = ikStpgen_getOutput(&sg, &output, "filtered control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected getOutput to return 0 for filtered control action, but it returned %d\n", err);
-    if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 8.0 for filtered control action, but it fetched %f\n", output);
     /* preferred control action curve is a unit gain */
     output = 0.0;
     err = ikStpgen_getOutput(&sg, &output, "preferred control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected getOutput to return 0 for preferred control action, but it returned %d\n", err);
-    if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 4.0 for preferred control action, but it fetched %f\n", output);
+    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 0.0 for preferred control action, but it fetched %f\n", output);
 
     /* see that, by default, the open loop gain is set to negative */
     ikStpgen_initParams(&params);
@@ -221,133 +204,11 @@ void testDefault() {
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
     ikStpgen_step(&sg, 10.0, 4.0, 8.0, -64.0, 64.0);
-    /* so, the preferred control action for the upper setpoint, 2.0 here, becomes the minimum control action at the output */
+    /* so, the preferred control action becomes the minimum control action at the output */
     output = 0.0;
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=expected getOutput to return 0 for minimum control action, but it returned %d\n", err);
-    if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 2.0 for minimum control action, but it fetched %f\n", output);
-
-}
-
-/**
- * Feedback filtering is initialised
- */
-void testFeedbackFiltering() {
-    printf("ikStpgen_test testFeedbackFiltering\n");
-    /* declare error code */
-    int err;
-    /* declare output */
-    double output = 0.0;
-    /* declare instance */
-    ikStpgen sg;
-    /* declare initialisation parameters */
-    ikStpgenParams params;
-
-    /* feedback filters work for feedback signal */
-    ikStpgen_initParams(&params);
-    params.feedbackFilters.demandTfs.tfParams[0].enable = 1;
-    params.feedbackFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    err = ikStpgen_init(&sg, &params);
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-    output = ikStpgen_step(&sg, 0.0, 1.0, 64.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "filtered feedback");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=getOutput expected to fetch 2.0 for filtered feedback, but it fetched %f\n", output);
-
-    /* feedback filters work for control action signal */
-    ikStpgen_initParams(&params);
-    params.feedbackFilters.demandTfs.tfParams[0].enable = 1;
-    params.feedbackFilters.demandTfs.tfParams[0].b[0] = 0.0;
-    params.feedbackFilters.measurementTfs.tfParams[0].enable = 1;
-    params.feedbackFilters.measurementTfs.tfParams[0].b[0] = -2.0;
-    err = ikStpgen_init(&sg, &params);
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-    output = ikStpgen_step(&sg, 0.0, 64.0, 1.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "filtered feedback");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testFeedbackFiltering (ikStpgen_test) message=getOutput expected to fetch 2.0 for filtered feedback, but it fetched %f\n", output);
-
-}
-
-/**
- * Control action filtering is initialised
- */
-void testControlActionFiltering() {
-    printf("ikStpgen_test testControlActionFiltering\n");
-    /* declare error code */
-    int err;
-    /* declare output */
-    double output = 0.0;
-    /* declare instance */
-    ikStpgen sg;
-    /* declare initialisation parameters */
-    ikStpgenParams params;
-
-    /* control action filters work for control action signal */
-    ikStpgen_initParams(&params);
-    params.controlActionFilters.demandTfs.tfParams[0].enable = 1;
-    params.controlActionFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    err = ikStpgen_init(&sg, &params);
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-    output = ikStpgen_step(&sg, 0.0, 64.0, 1.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "filtered control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=getOutput expected to fetch 2.0 for filtered control action, but it fetched %f\n", output);
-
-    /* control action filters work for feedback signal */
-    ikStpgen_initParams(&params);
-    params.controlActionFilters.demandTfs.tfParams[0].enable = 1;
-    params.controlActionFilters.demandTfs.tfParams[0].b[0] = 0.0;
-    params.controlActionFilters.measurementTfs.tfParams[0].enable = 1;
-    params.controlActionFilters.measurementTfs.tfParams[0].b[0] = -2.0;
-    err = ikStpgen_init(&sg, &params);
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-    output = ikStpgen_step(&sg, 0.0, 1.0, 64.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "filtered control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionFiltering (ikStpgen_test) message=getOutput expected to fetch 2.0 for filtered control action, but it fetched %f\n", output);
-
-}
-
-/**
- * Preferred control action curve is initialised
- */
-void testPreferredControlActionCurve() {
-    printf("ikStpgen_test testPreferredControlActionCurve\n");
-    /* declare error code */
-    int err;
-    /* declare output */
-    double output = 0.0;
-    /* declare instance */
-    ikStpgen sg;
-    /* declare initialisation parameters */
-    ikStpgenParams params;
-
-    /* see that an absolute value function can be implemented */
-    ikStpgen_initParams(&params);
-    params.preferredControlActionLutblN = 3;
-    params.preferredControlActionLutblX[0] = -1.0;
-    params.preferredControlActionLutblX[1] = 0.0;
-    params.preferredControlActionLutblX[2] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblY[1] = 0.0;
-    params.preferredControlActionLutblY[2] = 1.0;
-    err = ikStpgen_init(&sg, &params);
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-    output = ikStpgen_step(&sg, 0.0, 16.0, 64.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "preferred control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=getOutput expected to fetch 16.0 for preferred control action, but it fetched %f\n", output);
-    output = ikStpgen_step(&sg, 0.0, -16.0, 64.0, -128.0, 128.0);
-    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=expected step to return 0.0, but it returned %f\n", output);
-    err = ikStpgen_getOutput(&sg, &output, "preferred control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
-    if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testPreferredControlActionCurve (ikStpgen_test) message=getOutput expected to fetch 16.0 for preferred control action, but it fetched %f\n", output);
+    if (fabs(0.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikStpgen_test) message=getOutput expected to fetch 0.0 for minimum control action, but it fetched %f\n", output);
 
 }
 
@@ -366,6 +227,8 @@ void testStateMachineTransitionsFrom0() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca; /* here, arbitrarily, we'll manually make pca equal the feedback within the zones, and saturate at the setpoints*/
 
     /* initialise instance */
     ikStpgen_initParams(&params);
@@ -374,10 +237,13 @@ void testStateMachineTransitionsFrom0() {
     params.setpoints[1][0] = 2.0;
     params.setpoints[0][1] = 4.0;
     params.setpoints[1][1] = 8.0;
+    params.zoneTransitionHysteresis[0] = 2.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* stay at state 0, so setpoint at 1.0 and maximum control action at preferred control action for speed 1.0 */
+    pca = 1.0; /* because at speed 0.0, we are left of the first zone */
     output = ikStpgen_step(&sg, 128.0, 0.0, 0.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -388,6 +254,7 @@ void testStateMachineTransitionsFrom0() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but it fetched %f\n", output);
 
     /* move from state 0 to state 2, so setpoint at 2.0 and minimum control action at preferred control action  */
+    pca = 1.75; /* inside the first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 128.0, 1.75, 0.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -401,6 +268,7 @@ void testStateMachineTransitionsFrom0() {
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* move from state 0 to state 1, so setpoint at external maximum setpoint and minimum control action at preferred control action */
+    pca = 1.3; /* inside the first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 1.5, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -416,10 +284,12 @@ void testStateMachineTransitionsFrom0() {
     /* move from state 4, so setpoint at 4.0 and maximum control action at preferred control action, */
     /* to state 2, so setpoint at 2.0 and minimum control action at preferred control action. */
     /* Cause it with the external maximum setpoint */
+    pca = 8.0; /* saturated at last setpoint */
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
+    pca = 3.0; /*saturated at maximum setpoint */
     output = ikStpgen_step(&sg, 3.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     /* reinitialise the instance to go back to state 0 */
@@ -428,10 +298,12 @@ void testStateMachineTransitionsFrom0() {
 
     /* move from state 4, so setpoint at 4.0 and maximum control action at preferred control action, */
     /* to state 2, so setpoint at 2.0 and minimum control action at preferred control action */
+    pca = 8.0; /* saturated at last setpoint */
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
+    pca = 4.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 128.0, 4.0, 1.5, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     /* reinitialise the instance to go back to state 0 */
@@ -439,17 +311,17 @@ void testStateMachineTransitionsFrom0() {
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* stay at state 4, so setpoint at 4.0 and maximum control action at preferred control action */
+    pca = 8.0; /* saturated at last setpoint */
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 128.0, 128.0, 128.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
+    pca = 4.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 128.0, 4.0, 3.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     /* reinitialise the instance to go back to state 0 */
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom0 (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
-
-    /* */
 
 }
 
@@ -467,6 +339,8 @@ void testStateMachineTransitionsFrom1() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca; /* here, arbitrarily, we'll manually make pca equal the feedback within the zones, and saturate at the setpoints*/
 
     /* initialise instance */
     ikStpgen_initParams(&params);
@@ -475,10 +349,13 @@ void testStateMachineTransitionsFrom1() {
     params.setpoints[1][0] = 2.0;
     params.setpoints[0][1] = 4.0;
     params.setpoints[1][1] = 8.0;
+    params.zoneTransitionHysteresis[0] = 2.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* stay at state 1, so setpoint at external maximum setpoint and minimum control action at preferred control action */
+    pca = 1.3; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=expected step to return 1.5, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -487,6 +364,7 @@ void testStateMachineTransitionsFrom1() {
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=expected getOutput to return 0, but it returned %d\n", err);
     if (0.001 < fabs(output - 1.3)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=getOutput expected to fetch 1.3 for minimum control action, but it fetched %f\n", output);
+    pca = 1.4; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.6, 1.4, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.6)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=expected step to return 1.6, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -497,23 +375,28 @@ void testStateMachineTransitionsFrom1() {
     if (0.001 < fabs(output - 1.4)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=getOutput expected to fetch 1.4 for minimum control action, but it fetched %f\n", output);
 
     /* move from state 1 to state 2 and back */
+    pca = 1.3; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 128.0, 1.3, 0.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 1.5, but it returned %f\n", output);
 
     /* move from state 1 to state 0 and back, using the external maximum setpoint */
+    pca = 0.8; /* saturated at maximum setpoint */
     output = ikStpgen_step(&sg, 0.8, 1.3, 0.0, -256.0, 256.0);
     if (fabs(0.8-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 0.8, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=getOutput expected to return 0 for minimum control action, but it returned %d\n", err);
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but it fetched %f\n", output);
+    pca = 1.3; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 1.5, but it returned %f\n", output);
 
     /* move from state 1 to state 0 and back, using the feedback */
+    pca = 1.1; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.5, 1.1, 0.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 1.0, but it returned %f\n", output);
+    pca = 1.3; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testStateMachineTransitionsFrom1 (ikStpgen_test) message=step expected to return 1.5, but it returned %f\n", output);
 
@@ -592,6 +475,8 @@ void testOpenLoopGainSign() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca;
 
     /* initialise instance */
     ikStpgen_initParams(&params);
@@ -601,15 +486,12 @@ void testOpenLoopGainSign() {
     params.setpoints[1][0] = 2.0;
     params.setpoints[0][1] = 4.0;
     params.setpoints[1][1] = 8.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = -1.0;
-    params.preferredControlActionLutblX[1] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblY[1] = -1.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* state 0, open loop gain sign positive, so minimum control action at preferred control action */
+    pca = -1;
     output = ikStpgen_step(&sg, 128.0, 0.0, 0.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -620,6 +502,7 @@ void testOpenLoopGainSign() {
     if (fabs(-1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=getOutput expected to fetch -1.0 for minimum control action, but it fetched %f\n", output);
 
     /* state 1, open loop gain sign positive, so maximum control action at preferred control action */
+    pca = -1.3;
     output = ikStpgen_step(&sg, 1.5, 1.3, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected step to return 1.5, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -630,6 +513,7 @@ void testOpenLoopGainSign() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but it fetched %f\n", output);
 
     /* state 1, open loop gain sign positive, so maximum control action at preferred control action (but saturated) */
+    pca = -1.5;
     output = ikStpgen_step(&sg, 1.5, 1.7, 0.0, -256.0, 256.0);
     if (0.001 < fabs(output - 1.5)) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected step to return 1.5, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -640,6 +524,7 @@ void testOpenLoopGainSign() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but it fetched %f\n", output);
 
     /* state 2, open loop gain sign positive, so maximum control action at preferred control action */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 2.5, 1.7, 0.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -651,6 +536,7 @@ void testOpenLoopGainSign() {
 
     /* move from state 2 to state 4, open loop gain sign positive, so with a small */
     /* enough control action */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 16.0, 1.7, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testOpenLoopGainSign (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
@@ -669,18 +555,12 @@ void testGetOutput() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca = 128.0;
 
     /* initialise instance */
     ikStpgen_initParams(&params);
-    params.feedbackFilters.demandTfs.tfParams[0].enable = 1;
-    params.feedbackFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    params.controlActionFilters.demandTfs.tfParams[0].enable = 1;
-    params.controlActionFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = -1.0;
-    params.preferredControlActionLutblX[1] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblY[1] = -1.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
     output = ikStpgen_step(&sg, -512.0, -64.0, 32.0, -256.0, 256.0);
@@ -694,16 +574,6 @@ void testGetOutput() {
     err = ikStpgen_getOutput(&sg, &output, "control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for control action, but it returned %d\n", err);
     if (fabs(32.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch 32.0 for control action, but it fetched %f\n", output);
-
-    /* filtered feedback */
-    err = ikStpgen_getOutput(&sg, &output, "filtered feedback");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for filtered feedback, but it returned %d\n", err);
-    if (fabs(-128.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch -128.0 for filtered feedback, but it fetched %f\n", output);
-
-    /* filtered control action */
-    err = ikStpgen_getOutput(&sg, &output, "filtered control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for filtered control action, but it returned %d\n", err);
-    if (fabs(64.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch 64.0 for filtered control action, but it fetched %f\n", output);
 
     /* preferred control action */
     err = ikStpgen_getOutput(&sg, &output, "preferred control action");
@@ -740,16 +610,6 @@ void testGetOutput() {
     if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for setpoint, but it returned %d\n", err);
     if (fabs(-512.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch -512.0 for setpoint, but it fetched %f\n", output);
 
-    /* feedback filtering>demand */
-    err = ikStpgen_getOutput(&sg, &output, "feedback filtering>demand");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for feedback filtering>demand, but it returned %d\n", err);
-    if (fabs(-64.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch -64.0 for feedback filtering>demand, but it fetched %f\n", output);
-
-    /* control action filtering>demand */
-    err = ikStpgen_getOutput(&sg, &output, "control action filtering>demand");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return 0 for control action filtering>demand, but it returned %d\n", err);
-    if (fabs(32.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to fetch 32.0 for control action filtering>demand, but it fetched %f\n", output);
-
 }
 
 /**
@@ -765,29 +625,19 @@ void testGetOutputErrors() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca;
 
     /* initialise instance */
     ikStpgen_initParams(&params);
-    params.feedbackFilters.demandTfs.tfParams[0].enable = 1;
-    params.feedbackFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    params.controlActionFilters.demandTfs.tfParams[0].enable = 1;
-    params.controlActionFilters.demandTfs.tfParams[0].b[0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = -1.0;
-    params.preferredControlActionLutblX[1] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblY[1] = -1.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
     output = ikStpgen_step(&sg, -512.0, -64.0, 32.0, -256.0, 256.0);
 
-    /* -1 for filteredfeedback */
-    err = ikStpgen_getOutput(&sg, &output, "filteredfeedback");
-    if (-1 != err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return -1 for filteredfeedback, but it returned %d\n", err);
-
-    /* -2 for controls action filtering> */
-    err = ikStpgen_getOutput(&sg, &output, "controls action filtering>");
-    if (-2 != err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return -2 for controls action filtering>, but it returned %d\n", err);
+    /* -1 for ffeedback */
+    err = ikStpgen_getOutput(&sg, &output, "ffeedback");
+    if (-1 != err) printf("%%TEST_FAILED%% time=0 testname=testGetOutput (ikStpgen_test) message=expected getOutput to return -1 for ffeedback, but it returned %d\n", err);
 
 }
 
@@ -805,6 +655,8 @@ void testSmoothZoneTransitions() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca; /* here, arbitrarily, we'll manually make pca equal the feedback within the zones, and saturate at the setpoints*/
 
     /* initialise instance */
     ikStpgen_initParams(&params);
@@ -815,6 +667,9 @@ void testSmoothZoneTransitions() {
     params.setpoints[1][1] = 8.0;
     params.setpoints[0][2] = 16.0;
     params.setpoints[1][2] = 32.0;
+    params.zoneTransitionHysteresis[0] = 2.0;
+    params.zoneTransitionHysteresis[1] = 8.0;
+    params.preferredControlAction = &pca;
     params.nZoneTransitionSteps[0] = 2;
     params.nZoneTransitionSteps[1] = 4;
     params.nZoneTransitionLockSteps[0] = 2;
@@ -823,14 +678,17 @@ void testSmoothZoneTransitions() {
     if (err) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* get setpoint 1.0 */
+    pca = 1.0; /* saturated at smallest setpoint */
     output = ikStpgen_step(&sg, 64.0, 0.0, 0.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
 
     /* get setpoint 2.0 immediately */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, 0.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* stay at 2.0 until two steps have passed with a large control action */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, 5.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 2.0, 1.0, -256.0, 256.0);
@@ -845,22 +703,26 @@ void testSmoothZoneTransitions() {
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     
     /* get setpoint 4.0 in two extra steps, despite very low control action after the zone transition */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, 5.0, -256.0, 256.0);
     if (fabs(3.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 3.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* get setpoint 4.0 twice more after that, despite very low control action after the zone transition */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 immediately */
+    pca = 7.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 7.0, 5.0, -256.0, 256.0);
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* stay at 8.0 until three steps have passed with a large control action */
+    pca = 7.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 7.0, 20.0, -256.0, 256.0);
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 7.0, 20.0, -256.0, 256.0);
@@ -869,8 +731,10 @@ void testSmoothZoneTransitions() {
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
     
     /* get setpoint 16.0 in four extra steps, despite very low control action after the zone transition */
+    pca = 7.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 7.0, 20.0, -256.0, 256.0);
     if (fabs(10.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 10.0, but it returned %f\n", output);
+    pca = 16.0; /* saturated at lower end of third zone */
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
     if (fabs(12.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 12.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
@@ -879,6 +743,7 @@ void testSmoothZoneTransitions() {
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
 
     /* get setpoint 16.0 thrice more after that, despite very low control action after the zone transition */
+    pca = 16.0; /* saturated at lower end of third zone */
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
@@ -887,10 +752,10 @@ void testSmoothZoneTransitions() {
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 in four extra steps, despite very high control action after the zone transition */
+    pca = 16.0; /* saturated at lower setpoint of third zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 7.0, -256.0, 256.0);
-    if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
-    output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(14.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 14.0, but it returned %f\n", output);
+    pca = 8.0; /* saturated at upper end of second zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(12.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 12.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
@@ -899,6 +764,7 @@ void testSmoothZoneTransitions() {
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 thrice more after that, despite very high control action after the zone transition */
+    pca = 8.0; /* saturated at upper setpoint of second zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
@@ -907,30 +773,34 @@ void testSmoothZoneTransitions() {
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* get setpoint 4.0 immediately */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 7.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* stay at 4.0 until two steps have passed with a small control action */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     
     /* get setpoint 2.0 in two extra steps, despite very high control action after the zone transition */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
-    if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
-    output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(3.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 3.0, but it returned %f\n", output);
+    pca = 2.0; /* saturated at upper end of first zone */
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* get setpoint 2.0 twice more after that, despite very high control action after the zone transition */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* get setpoint 1.0 immediately */
+    pca = 1.2; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 1.2, 1.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
 
@@ -940,32 +810,39 @@ void testSmoothZoneTransitions() {
     if (err) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected init to return 0, but it returned %d\n", err);
 
     /* get setpoint 1.0 */
+    pca = 1.0; /* saturated at smallest setpoint */
     output = ikStpgen_step(&sg, 64.0, 0.0, 0.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
 
     /* get setpoint 2.0 immediately */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, 0.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* get setpoint 4.0 in two extra steps, despite very low control action after the zone transition */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, 5.0, -256.0, 256.0);
     if (fabs(3.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 3.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* get setpoint 4.0 twice more after that, despite very low control action after the zone transition */
+    pca = 2.0; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 2.0, -5.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 immediately */
+    pca = 7.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 7.0, 5.0, -256.0, 256.0);
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* get setpoint 16.0 in four extra steps, despite very low control action after the zone transition */
+    pca = 7.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 7.0, 20.0, -256.0, 256.0);
     if (fabs(10.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 10.0, but it returned %f\n", output);
+    pca = 16.0; /* saturated at lower end of third zone */
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
     if (fabs(12.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 12.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
@@ -974,6 +851,7 @@ void testSmoothZoneTransitions() {
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
 
     /* get setpoint 16.0 thrice more after that, despite very low control action after the zone transition */
+    pca = 16.0; /* saturated at lower end of third zone */
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 7.0, -20.0, -256.0, 256.0);
@@ -982,10 +860,10 @@ void testSmoothZoneTransitions() {
     if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 in four extra steps, despite very high control action after the zone transition */
+    pca = 16.0; /* saturated at lower end of third zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 7.0, -256.0, 256.0);
-    if (fabs(16.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 16.0, but it returned %f\n", output);
-    output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(14.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 14.0, but it returned %f\n", output);
+    pca = 8.0; /* saturated at upper end of second zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(12.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 12.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
@@ -994,6 +872,7 @@ void testSmoothZoneTransitions() {
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* get setpoint 8.0 thrice more after that, despite very high control action after the zone transition */
+    pca = 8.0; /* saturated at upper end of second zone */
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 9.0, 17.0, -256.0, 256.0);
@@ -1002,30 +881,34 @@ void testSmoothZoneTransitions() {
     if (fabs(8.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 8.0, but it returned %f\n", output);
 
     /* get setpoint 4.0 immediately */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 7.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
 
     /* stay at 4.0 until two steps have passed with a small control action */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
     if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
     
     /* get setpoint 2.0 in two extra steps, despite very high control action after the zone transition */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 1.0, -256.0, 256.0);
-    if (fabs(4.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 4.0, but it returned %f\n", output);
-    output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
+    pca = 2.0; /* saturated at upper end of first zone */
     if (fabs(3.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 3.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* get setpoint 2.0 twice more after that, despite very high control action after the zone transition */
+    pca = 5.0; /* inside second zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
     output = ikStpgen_step(&sg, 64.0, 5.0, 11.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 2.0, but it returned %f\n", output);
 
     /* get setpoint 1.0 immediately */
+    pca = 1.2; /* inside first zone, so equal to feedback */
     output = ikStpgen_step(&sg, 64.0, 1.2, 1.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testSmoothZoneTransitions (ikStpgen_test) message=expected step to return 1.0, but it returned %f\n", output);
 
@@ -1092,11 +975,6 @@ void testSensibleControlActionLimits() {
     params.nzones = 1;
     params.setpoints[0][0] = 1.0;
     params.setpoints[1][0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblX[1] = 2.0;
-    params.preferredControlActionLutblY[1] = 1.0;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testSensibleControlActionLimits (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
 
@@ -1138,22 +1016,21 @@ void testControlActionLimitRate() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca; /* here, arbitrarily, we'll manually make pca equal the feedback (or minus it) within the zones, and saturate at the setpoints*/
 
     /* initialise instance */
     ikStpgen_initParams(&params);
     params.nzones = 1;
     params.setpoints[0][0] = 1.0;
     params.setpoints[1][0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = 1.0;
-    params.preferredControlActionLutblY[0] = 1.0;
-    params.preferredControlActionLutblX[1] = 2.0;
-    params.preferredControlActionLutblY[1] = 2.0;
+    params.preferredControlAction = &pca;
     params.controlActionLimitRate = 0.3;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
 
     /* OL gain sign negative. State 0. Control action far above preferred control action. */
+    pca = 1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, 5.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1164,6 +1041,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 0. Control action far below preferred control action. */
+    pca = 1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, -5.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1174,6 +1052,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 0. Control action a bit above preferred control action. */
+    pca = 1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, 1.2, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1184,6 +1063,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 0. Control action a bit below preferred control action. */
+    pca = 1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, 1.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1194,6 +1074,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 2. Control action far below preferred control action. */
+    pca = 1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, -5.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1204,6 +1085,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 2. Control action far above preferred control action. */
+    pca = 1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, 5.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1214,6 +1096,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 2. Control action a bit below preferred control action. */
+    pca = 1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, 1.7, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1224,6 +1107,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 2. Control action a bit above preferred control action. */
+    pca = 1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, 2.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1234,6 +1118,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 1. Control action far below preferred control action. */
+    pca = 1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, -4.0, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1244,6 +1129,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 1. Control action far above preferred control action. */
+    pca = 1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, 4.0, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1254,6 +1140,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 1. Control action a bit below preferred control action. */
+    pca = 1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, 1.6, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1264,6 +1151,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign negative. State 1. Control action a bit above preferred control action. */
+    pca = 1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, 1.8, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1279,16 +1167,13 @@ void testControlActionLimitRate() {
     params.nzones = 1;
     params.setpoints[0][0] = 1.0;
     params.setpoints[1][0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = 1.0;
-    params.preferredControlActionLutblY[0] = -1.0;
-    params.preferredControlActionLutblX[1] = 2.0;
-    params.preferredControlActionLutblY[1] = -2.0;
+    params.preferredControlAction = &pca;
     params.controlActionLimitRate = 0.3;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
     
     /* OL gain sign positive. State 0. Control action far below preferred control action. */
+    pca = -1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, -5.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1299,6 +1184,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 0. Control action far above preferred control action. */
+    pca = -1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, 5.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1309,6 +1195,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 0. Control action a bit below preferred control action. */
+    pca = -1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, -1.2, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1319,6 +1206,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 0. Control action a bit above preferred control action. */
+    pca = -1.1;
     output = ikStpgen_step(&sg, 3.0, 1.1, -1.0, -256.0, 256.0);
     if (fabs(1.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
@@ -1329,6 +1217,7 @@ void testControlActionLimitRate() {
     if (fabs(256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch 256.0 for maximum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 2. Control action far above preferred control action. */
+    pca = -1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, 5.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1339,6 +1228,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 2. Control action far below preferred control action. */
+    pca = -1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, -5.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1349,6 +1239,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 2. Control action a bit above preferred control action. */
+    pca = -1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, -1.8, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1359,6 +1250,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 2. Control action a bit below preferred control action. */
+    pca = -1.9;
     output = ikStpgen_step(&sg, 3.0, 1.9, -2.0, -256.0, 256.0);
     if (fabs(2.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 2.0, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1369,6 +1261,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 1. Control action far above preferred control action. */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, 4.0, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1379,6 +1272,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 1. Control action far below preferred control action. */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, -4.0, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1389,6 +1283,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 1. Control action a bit above preferred control action. */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, -1.6, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1399,6 +1294,7 @@ void testControlActionLimitRate() {
     if (fabs(-256.0-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=getOutput expected to fetch -256.0 for minimum control action, but fetched %f\n", output);
     
     /* OL gain sign positive. State 1. Control action a bit below preferred control action. */
+    pca = -1.7;
     output = ikStpgen_step(&sg, 1.75, 1.7, -1.8, -256.0, 256.0);
     if (fabs(1.75-output) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=testControlActionLimitRate (ikStpgen_test) message=step expected to return 1.75, but returned %f\n", output);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
@@ -1420,17 +1316,15 @@ void testExternalLimitCollisionWithPreferred() {
     ikStpgen sg;
     /* declare initialisation parameters */
     ikStpgenParams params;
+    /* allocate preferred control action*/
+    double pca = 2.0; /* here, arbitrarily, we'll leave pca constant here*/
 
     /* initialise instance */
     ikStpgen_initParams(&params);
     params.nzones = 1;
     params.setpoints[0][0] = 1.0;
     params.setpoints[1][0] = 2.0;
-    params.preferredControlActionLutblN = 2;
-    params.preferredControlActionLutblX[0] = 1.0;
-    params.preferredControlActionLutblY[0] = 2.0;
-    params.preferredControlActionLutblX[1] = 2.0;
-    params.preferredControlActionLutblY[1] = 2.0;
+    params.preferredControlAction = &pca;
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
 
@@ -1441,6 +1335,7 @@ void testExternalLimitCollisionWithPreferred() {
     if (1e-9 < fabs(output - 1.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 1.0 for minimum control action, but fetched %f\n", output);
     
     /* see that external minimum control action is applied although >2.0 */
+    pca = 
     ikStpgen_step(&sg, 2.0, 1.0, 0.0, 3.0, 5.0);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for maximum control action, but returned %d\n", err);
@@ -1476,18 +1371,6 @@ int main(int argc, char** argv) {
     printf("%%TEST_STARTED%% testDefault (ikStpgen_test)\n");
     testDefault();
     printf("%%TEST_FINISHED%% time=0 testDefault (ikStpgen_test) \n");
-
-    printf("%%TEST_STARTED%% testFeedbackFiltering (ikStpgen_test)\n");
-    testFeedbackFiltering();
-    printf("%%TEST_FINISHED%% time=0 testFeedbackFiltering (ikStpgen_test) \n");
-
-    printf("%%TEST_STARTED%% testControlActionFiltering (ikStpgen_test)\n");
-    testControlActionFiltering();
-    printf("%%TEST_FINISHED%% time=0 testControlActionFiltering (ikStpgen_test) \n");
-
-    printf("%%TEST_STARTED%% testPreferredControlActionCurve (ikStpgen_test)\n");
-    testPreferredControlActionCurve();
-    printf("%%TEST_FINISHED%% time=0 testPreferredControlActionCurve (ikStpgen_test) \n");
 
     printf("%%TEST_STARTED%% testStateMachineTransitionsFrom0 (ikStpgen_test)\n");
     testStateMachineTransitionsFrom0();

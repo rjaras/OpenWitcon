@@ -35,7 +35,6 @@ int ikStpgen_init(ikStpgen *self, const ikStpgenParams *params) {
 
     /* declare error code */
     int err = 0;
-    int err_;
 
     /* initialise state machine */
     self->state = 0;
@@ -49,6 +48,7 @@ int ikStpgen_init(ikStpgen *self, const ikStpgenParams *params) {
     self->externalMaximumControlAction = 0.0;
     self->externalMinimumControlAction = 0.0;
     self->externalMaximumSetpoint = 0.0;
+    self->uopt = 0.0;
 
     /* register open loop gain sign */
     if (0 > params->openLoopGainSign) {
@@ -56,17 +56,9 @@ int ikStpgen_init(ikStpgen *self, const ikStpgenParams *params) {
     } else {
         self->olsign = 1;
     }
-
-    /* initialise filters */
-    err_ = ikLinCon_init(&(self->yFilters), &(params->feedbackFilters));
-    if (!err && err_) err = -1;
-    err_ = ikLinCon_init(&(self->uFilters), &(params->controlActionFilters));
-    if (!err && err_) err = -2;
-
-    /* initialise preferred control action look-up table */
-    ikLutbl_init(&(self->uopt));
-    err_ = ikLutbl_setPoints(&(self->uopt), params->preferredControlActionLutblN, params->preferredControlActionLutblX, params->preferredControlActionLutblY);
-    if (!err && err_) err = -3;
+    
+    /* register preferred control action*/
+    self->pUopt = params->preferredControlAction;
 
     /* register zones */
     self->nzones = params->nzones;
@@ -93,6 +85,17 @@ int ikStpgen_init(ikStpgen *self, const ikStpgenParams *params) {
     for (i = 0; i < params->nzones; i++) {
         self->setpoints[0][i] = params->setpoints[0][i];
         self->setpoints[1][i] = params->setpoints[1][i];
+    }
+    
+    /* register zone transition hysteresis values*/
+    for (i = 0; i < params->nzones - 1; i++) {
+        if (params->zoneTransitionHysteresis[i] < 0.0) {
+            self->nzones = 0;
+            if (!err) err = -3;
+        }
+    }
+    for (i = 0; i < params->nzones - 1; i++) {
+        self->zoneTransitionHysteresis[i] = params->zoneTransitionHysteresis[i];
     }
 
     /* register zone transition step numbers */
@@ -142,29 +145,22 @@ int ikStpgen_init(ikStpgen *self, const ikStpgenParams *params) {
 void ikStpgen_initParams(ikStpgenParams *params) {
     int i;
 
-    /* make the filters static unit gains, with no mixing */
-    ikLinCon_initParams(&(params->feedbackFilters));
-    params->feedbackFilters.measurementTfs.tfParams[0].enable = 1;
-    params->feedbackFilters.measurementTfs.tfParams[0].b[0] = 0.0;
-    ikLinCon_initParams(&(params->controlActionFilters));
-    params->controlActionFilters.measurementTfs.tfParams[0].enable = 1;
-    params->controlActionFilters.measurementTfs.tfParams[0].b[0] = 0.0;
-
     /* set open loop gain to negative */
     params->openLoopGainSign = -1;
-
-    /* make the preferred control action curve a unit gain */
-    params->preferredControlActionLutblN = 2;
-    params->preferredControlActionLutblX[0] = -1.0;
-    params->preferredControlActionLutblX[1] = 1.0;
-    params->preferredControlActionLutblY[0] = -1.0;
-    params->preferredControlActionLutblY[1] = 1.0;
+    
+    /* disable preferred control action*/
+    params->preferredControlAction = NULL;
 
     /* disable setpoint hopping */
     params->nzones = 0;
     for (i = 0; i < IKSTPGEN_NZONEMAX; i++) {
         params->setpoints[0][i] = 0.0;
         params->setpoints[1][i] = 0.0;
+    }
+    
+    /* disable zone transition hysteresis */
+    for (i = 0; i < IKSTPGEN_NZONEMAX - 1; i++) {
+        params->zoneTransitionHysteresis[i] = 0.0;
     }
 
     /* make setpoint hopping immediate */
@@ -185,10 +181,6 @@ void ikStpgen_initParams(ikStpgenParams *params) {
 }
 
 double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAct, double minCon, double maxCon) {
-    double filteredFeedback;
-    double filteredControlAction;
-    double uopt;
-    double uoptSat;
     int zone;
 
     /* register inputs */
@@ -197,10 +189,13 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
     self->externalMaximumControlAction = maxCon;
     self->externalMinimumControlAction = minCon;
     self->externalMaximumSetpoint = maxSp;
-
-    /* take step with the filters */
-    filteredFeedback = ikLinCon_step(&(self->yFilters), feedback, conAct);
-    filteredControlAction = ikLinCon_step(&(self->uFilters), conAct, feedback);
+    
+    /* register the preferred control action*/
+    if (NULL != self->pUopt) {
+        self->uopt = *(self->pUopt);
+    } else {
+        self->uopt = 0.0;
+    }
 
     /* if there are no zones, wave the maximum setpoint through */
     if (1 > self->nzones) {
@@ -211,7 +206,6 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
     }
 
     /* update state */
-    uopt = ikLutbl_eval(&(self->uopt), filteredFeedback);
     zone = (int) floor(self->state / 4 + 0.1);
     switch (self->state - 4 * zone) {
         case 0:
@@ -220,19 +214,19 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                 break;
             }
 
-            if (((self->setpoints[0][zone] + self->setpoints[1][zone]) / 2 < filteredFeedback) && (maxSp > self->setpoints[1][zone])) {
+            if (((self->setpoints[0][zone] + self->setpoints[1][zone]) / 2 < self->feedback) && (maxSp > self->setpoints[1][zone])) {
                 self->state += 2;
                 break;
             }
 
-            if (((self->setpoints[0][zone] + maxSp) / 2 < filteredFeedback) && (maxSp > self->setpoints[0][zone])) {
+            if (((self->setpoints[0][zone] + maxSp) / 2 < self->feedback) && (maxSp > self->setpoints[0][zone])) {
                 self->state += 1;
                 break;
             }
 
             if ((zone > 0)
                     &&
-                    ((ikLutbl_eval(&(self->uopt), self->setpoints[1][zone - 1]) - filteredControlAction) * self->olsign < 0)
+                    ((self->controlAction - self->uopt)*self->olsign > self->zoneTransitionHysteresis[zone-1])
                     &&
                     (self->iZoneTransitionSteps[zone - 1] >= self->nZoneTransitionSteps[zone - 1])
                     &&
@@ -249,7 +243,7 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                 break;
             }
 
-            if (((self->setpoints[0][zone] + maxSp) / 2 > filteredFeedback) || (maxSp < self->setpoints[0][zone])) {
+            if (((self->setpoints[0][zone] + maxSp) / 2 > self->feedback) || (maxSp < self->setpoints[0][zone])) {
                 self->state -= 1;
                 break;
             }
@@ -261,14 +255,14 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                 break;
             }
 
-            if ((self->setpoints[0][zone] + self->setpoints[1][zone]) / 2 > filteredFeedback) {
+            if ((self->setpoints[0][zone] + self->setpoints[1][zone]) / 2 > self->feedback) {
                 self->state -= 2;
                 break;
             }
 
             if ((zone < self->nzones - 1)
                     &&
-                    ((ikLutbl_eval(&(self->uopt), self->setpoints[0][zone + 1]) - filteredControlAction) * self->olsign > 0)
+                    ((self->uopt - self->controlAction)*self->olsign > self->zoneTransitionHysteresis[zone])
                     &&
                     (0 >= self->iZoneTransitionSteps[zone])
                     &&
@@ -288,7 +282,7 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
     switch (self->state - 4 * zone) {
         case 0:
             if (0 < zone) {
-                if ((ikLutbl_eval(&(self->uopt), self->setpoints[1][zone - 1]) - filteredControlAction) * self->olsign < 0) {
+                if ((self->controlAction - self->uopt)*self->olsign > self->zoneTransitionHysteresis[zone-1]) {
                     if ((self->iZoneTransitionSteps[zone - 1] >= self->nZoneTransitionSteps[zone - 1])
                             &&
                             (0 < self->iZoneTransitionLockSteps[zone - 1]))
@@ -303,9 +297,8 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
             } else {
                 self->r = self->setpoints[0][zone];
             }
-            uoptSat = ikLutbl_eval(&(self->uopt), self->setpoints[0][zone]);
             if (0 > self->olsign) {
-                self->maxCon = uopt > uoptSat ? uopt : uoptSat;
+                self->maxCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->maxCon = self->maxCon > conAct - self->controlActionLimitRate ? self->maxCon : conAct - self->controlActionLimitRate;
                     self->maxCon = self->maxCon < conAct + self->controlActionLimitRate ? self->maxCon : conAct + self->controlActionLimitRate;
@@ -314,7 +307,7 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                 self->maxCon = self->maxCon > self->minCon ? self->maxCon : self->minCon;
             } else {
                 self->maxCon = maxCon;
-                self->minCon = uopt < uoptSat ? uopt : uoptSat;
+                self->minCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->minCon = self->minCon < conAct + self->controlActionLimitRate ? self->minCon : conAct + self->controlActionLimitRate;
                     self->minCon = self->minCon > conAct - self->controlActionLimitRate ? self->minCon : conAct - self->controlActionLimitRate;
@@ -329,17 +322,16 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
             break;
         case 1:
             self->r = maxSp;
-            uoptSat = ikLutbl_eval(&(self->uopt), maxSp);
             if (0 > self->olsign) {
                 self->maxCon = maxCon;
-                self->minCon = uopt < uoptSat ? uopt : uoptSat;
+                self->minCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->minCon = self->minCon < conAct + self->controlActionLimitRate ? self->minCon : conAct + self->controlActionLimitRate;
                     self->minCon = self->minCon > conAct - self->controlActionLimitRate ? self->minCon : conAct - self->controlActionLimitRate;
                 }
                 self->minCon = self->minCon < self->maxCon ? self->minCon : self->maxCon;
             } else {
-                self->maxCon = uopt > uoptSat ? uopt : uoptSat;
+                self->maxCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->maxCon = self->maxCon > conAct - self->controlActionLimitRate ? self->maxCon : conAct - self->controlActionLimitRate;
                     self->maxCon = self->maxCon < conAct + self->controlActionLimitRate ? self->maxCon : conAct + self->controlActionLimitRate;
@@ -350,31 +342,30 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
             break;
         case 2:
             if (zone < self->nzones - 1) {
-                if ((ikLutbl_eval(&(self->uopt), self->setpoints[0][zone + 1]) - filteredControlAction) * self->olsign > 0) {
+                if ((self->uopt - self->controlAction)*self->olsign > self->zoneTransitionHysteresis[zone]) {
                     if (0 >= self->iZoneTransitionSteps[zone]
                             &&
                             0 < self->iZoneTransitionLockSteps[zone])
                         self->iZoneTransitionLockSteps[zone]--;
-                    if (0 < self->iZoneTransitionSteps[zone]) self->iZoneTransitionSteps[zone]--;
                 } else {
                     self->iZoneTransitionLockSteps[zone] = self->nZoneTransitionLockSteps[zone];
                 }
+                if (0 < self->iZoneTransitionSteps[zone]) self->iZoneTransitionSteps[zone]--;
             }
             if (self->nzones - 1 > zone && self->nZoneTransitionSteps[zone] > 0) {
                 self->r = self->setpoints[1][zone] + ((double)self->iZoneTransitionSteps[zone]) / self->nZoneTransitionSteps[zone] * (self->setpoints[0][zone + 1] - self->setpoints[1][zone]);
             } else {
                 self->r = self->setpoints[1][zone];
             }
-            uoptSat = ikLutbl_eval(&(self->uopt), self->setpoints[1][zone]);
             if (0 > self->olsign) {
                 self->maxCon = maxCon;
-                self->minCon = uopt < uoptSat ? uopt : uoptSat;
+                self->minCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->minCon = self->minCon < conAct + self->controlActionLimitRate ? self->minCon : conAct + self->controlActionLimitRate;
                     self->minCon = self->minCon > conAct - self->controlActionLimitRate ? self->minCon : conAct - self->controlActionLimitRate;
                 }
             } else {
-                self->maxCon = uopt > uoptSat ? uopt : uoptSat;
+                self->maxCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
                     self->maxCon = self->maxCon > conAct - self->controlActionLimitRate ? self->maxCon : conAct - self->controlActionLimitRate;
                     self->maxCon = self->maxCon < conAct + self->controlActionLimitRate ? self->maxCon : conAct + self->controlActionLimitRate;
@@ -427,40 +418,12 @@ int ikStpgen_getOutput(const ikStpgen *self, double *output, const char *name) {
         *output = self->minCon;
         return 0;
     }
-    if (!strcmp(name, "filtered feedback")) {
-        ikLinCon_getOutput(&(self->yFilters), output, "control action");
-        return 0;
-    }
-    if (!strcmp(name, "filtered control action")) {
-        ikLinCon_getOutput(&(self->uFilters), output, "control action");
-        return 0;
-    }
     if (!strcmp(name, "preferred control action")) {
-        double fca;
-        ikLinCon_getOutput(&(self->yFilters), &fca, "control action");
-        *output = ikLutbl_eval(&(self->uopt), fca);
+        *output = self->uopt;
         return 0;
     }
 
-    /* pick up the blocks */
-    sep = strstr(name, ">");
-    if (NULL == sep) return -1;
-    if (!strncmp(name, "feedback filtering", strlen(name) - strlen(sep))) {
-        if (ikLinCon_getOutput(&self->yFilters, output, sep + 1)) {
-            return -1;
-        } else {
-            return 0;
-        }
-    }
-    if (!strncmp(name, "control action filtering", strlen(name) - strlen(sep))) {
-        if (ikLinCon_getOutput(&self->uFilters, output, sep + 1)) {
-            return -1;
-        } else {
-            return 0;
-        }
-    }
-
-    return -2;
+    return -1;
 }
 
 

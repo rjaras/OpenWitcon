@@ -29,9 +29,6 @@ along with OpenWitcon. If not, see <http://www.gnu.org/licenses/>.
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
-#include "ikLutbl.h"
-#include "ikLinCon.h"
 
 #define IKSTPGEN_NZONEMAX 8
     
@@ -82,13 +79,13 @@ extern "C" {
          * Private members
          */
         /* @cond */
-        ikLutbl     uopt;
-        ikLinCon    yFilters;
-        ikLinCon    uFilters;
+        double      *pUopt;
+        double      uopt;
         int         state;
         int         olsign;
         int         nzones;
         double      setpoints [2][IKSTPGEN_NZONEMAX];
+        double      zoneTransitionHysteresis [IKSTPGEN_NZONEMAX - 1];
         int         nZoneTransitionSteps [IKSTPGEN_NZONEMAX - 1];
         int         iZoneTransitionSteps [IKSTPGEN_NZONEMAX - 1];
         int         nZoneTransitionLockSteps [IKSTPGEN_NZONEMAX - 1];
@@ -111,23 +108,21 @@ extern "C" {
      * @brief Setpoint generator initialisation parameters
      */
     typedef struct ikStpgenParams {
-        ikLinConParams  feedbackFilters;                                        /**<feedback filtering initialisation parameters*/
-        ikLinConParams  controlActionFilters;                                   /**<control action filtering initialisation parameters*/
         int             openLoopGainSign;                                       /**<sign of the open loop gain of the feedback loop for which the
                                                                                  setpoint is generated. 0 is valid and will be considered positive.
                                                                                  The default value is -1.*/
-        int             preferredControlActionLutblN;                           /**<number of points in the preferred control action curve.
-                                                                                 The default is 2.*/
-        double          preferredControlActionLutblX    [IKLUTBL_MAXPOINTS];    /**<input values of the points in the preferred control action curve.
-                                                                                 The default is {-1.0, 1.0}*/
-        double          preferredControlActionLutblY    [IKLUTBL_MAXPOINTS];    /**<output values of the points in the preferred control action curve.
-                                                                                 The default is {-1.0, 1.0}*/
+        double          *preferredControlAction;                                /**<pointer to persistent memory location storing the value of the
+                                                                                 preferred control action. If NULL, 0.0 is the preferred control action.
+                                                                                 The default is NULL.*/
         int             nzones;                                                 /**<number of zones where the preferred control action is applicable.
                                                                                  The default is 0.*/
         double          setpoints                       [2][IKSTPGEN_NZONEMAX]; /**<allowed setpoint values, arranged in one column per zone and two rows.
                                                                                 The first row contains the lower limit of each zone.
                                                                                 The second row contains the upper limit of each zone.
                                                                                  The default is a zero-filled array.*/
+        double          zoneTransitionHysteresis        [IKSTPGEN_NZONEMAX - 1]; /**<zone transition hysteresis values. Zone transitions are triggered when
+                                                                                  the control action differs from the preferred control action by more than
+                                                                                  this value. Negative values are invalid. The default is 0.0.*/
         int             nZoneTransitionSteps            [IKSTPGEN_NZONEMAX - 1];/**<number of steps or sampling intervals the setpoint takes to go from
                                                                                  * the upper limit of a zone to the lower limit of the next, and vice versa.
                                                                                  * The default is 0.*/
@@ -148,9 +143,7 @@ extern "C" {
      * @param params initialisation parameters
      * @return error code:
      * @li 0: no error
-     * @li -1: could not initialise feedback filtering
-     * @li -2: could not initialise control action filtering
-     * @li -3: could not initialise preferred control action curve
+     * @li -3: invalid zone transition hysteresis values, they must be non-negative
      * @li -4: invalid zone number, it must be between 0 and @link IKSTPGEN_NZONEMAX @endlink
      * @li -5: invalid setpoints, they must be sorted
      * @li -6: invalid zone transition step number, it must be non-negative
@@ -187,7 +180,6 @@ extern "C" {
      * @return error code:
      * @li 0: no error
      * @li -1: invalid signal name
-     * @li -2: invalid block name
      */
     int ikStpgen_getOutput(const ikStpgen *self, double *output, const char *name);
 
