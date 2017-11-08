@@ -1328,14 +1328,19 @@ void testExternalLimitCollisionWithPreferred() {
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
 
-    /* see that external maximum control action is applied although <2.0 */
-    ikStpgen_step(&sg, 2.0, 2.0, 0.0, 0.0, 1.0);
+    /* state 2, see that external maximum control action is applied although <2.0 */
+    ikStpgen_step(&sg, 2.1, 2.0, 0.0, 0.0, 1.0);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for minimum control action, but returned %d\n", err);
     if (1e-9 < fabs(output - 1.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 1.0 for minimum control action, but fetched %f\n", output);
     
-    /* see that external minimum control action is applied although >2.0 */
-    pca = 
+    /* state 1, see that external maximum control action is applied although <2.0 */
+    ikStpgen_step(&sg, 1.9, 2.0, 0.0, 0.0, 1.0);
+    err = ikStpgen_getOutput(&sg, &output, "minimum control action");
+    if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for minimum control action, but returned %d\n", err);
+    if (1e-9 < fabs(output - 1.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 1.0 for minimum control action, but fetched %f\n", output);
+    
+    /* state 0, see that external minimum control action is applied although >2.0 */
     ikStpgen_step(&sg, 2.0, 1.0, 0.0, 3.0, 5.0);
     err = ikStpgen_getOutput(&sg, &output, "maximum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for maximum control action, but returned %d\n", err);
@@ -1346,17 +1351,23 @@ void testExternalLimitCollisionWithPreferred() {
     err = ikStpgen_init(&sg, &params);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=init expected to return 0, but returned %d\n", err);
 
-    /* see that external maximum control action is applied although <2.0 */
+    /*state 2, see that external maximum control action is applied although <2.0 */
+    ikStpgen_step(&sg, 2.2, 2.0, 0.0, 3.0, 5.0);
+    err = ikStpgen_getOutput(&sg, &output, "maximum control action");
+    if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for maximum control action, but returned %d\n", err);
+    if (1e-9 < fabs(output - 3.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 3.0 for maximum control action, but fetched %f\n", output);
+    
+    /*state 1, see that external maximum control action is applied although <2.0 */
+    ikStpgen_step(&sg, 1.9, 2.0, 0.0, 3.0, 5.0);
+    err = ikStpgen_getOutput(&sg, &output, "maximum control action");
+    if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for maximum control action, but returned %d\n", err);
+    if (1e-9 < fabs(output - 3.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 3.0 for maximum control action, but fetched %f\n", output);
+    
+    /* state 0, see that external minimum control action is applied although >2.0 */
     ikStpgen_step(&sg, 2.0, 1.0, 0.0, 0.0, 1.0);
     err = ikStpgen_getOutput(&sg, &output, "minimum control action");
     if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for minimum control action, but returned %d\n", err);
     if (1e-9 < fabs(output - 1.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 1.0 for minimum control action, but fetched %f\n", output);
-    
-    /* see that external minimum control action is applied although >2.0 */
-    ikStpgen_step(&sg, 2.0, 2.0, 0.0, 3.0, 5.0);
-    err = ikStpgen_getOutput(&sg, &output, "maximum control action");
-    if (err) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to return 0 for maximum control action, but returned %d\n", err);
-    if (1e-9 < fabs(output - 3.0)) printf("%%TEST_FAILED%% time=0 testname=testExternalLimitCollisionWithPreferred (ikStpgen_test) message=getOutput expected to fetch 3.0 for maximum control action, but fetched %f\n", output);
     
 }
 

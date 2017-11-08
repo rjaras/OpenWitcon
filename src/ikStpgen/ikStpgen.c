@@ -364,6 +364,7 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                     self->minCon = self->minCon < conAct + self->controlActionLimitRate ? self->minCon : conAct + self->controlActionLimitRate;
                     self->minCon = self->minCon > conAct - self->controlActionLimitRate ? self->minCon : conAct - self->controlActionLimitRate;
                 }
+                self->minCon = self->minCon < self->maxCon ? self->minCon : self->maxCon;
             } else {
                 self->maxCon = self->uopt;
                 if (0.0 < self->controlActionLimitRate) {
@@ -371,6 +372,7 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
                     self->maxCon = self->maxCon < conAct + self->controlActionLimitRate ? self->maxCon : conAct + self->controlActionLimitRate;
                 }
                 self->minCon = minCon;
+                self->maxCon = self->maxCon > self->minCon ? self->maxCon : self->minCon;
             }
             break;
     }
@@ -383,7 +385,6 @@ double ikStpgen_step(ikStpgen *self, double maxSp, double feedback, double conAc
 }
 
 int ikStpgen_getOutput(const ikStpgen *self, double *output, const char *name) {
-    const char *sep;
 
     /* pick up the signals */
     if (!strcmp(name, "feedback")) {
