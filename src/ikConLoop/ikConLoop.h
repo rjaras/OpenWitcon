@@ -134,12 +134,16 @@ extern "C" {
     
     /**
      * Get output value by name. All signals named on the block diagram of
-     * @link ikStpgen @endlink are accessible.
+     * @link ikStpgen @endlink are accessible. To refer to sub-block
+     * signals, use the sub-block name followed by a ">" character and the
+     * signal name.
      * @param self control loop instance
      * @param output output value
      * @param name output name
      * @return error code:
      * @li 0: no error
+     * @li -1: invalid signal name
+     * @li -2: invalid block name
      */
     int ikConLoop_getOutput(const ikConLoop *self, double *output, const char *name);
 
