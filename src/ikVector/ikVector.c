@@ -74,7 +74,7 @@ ikVector ikVector_cross(ikVector u, ikVector v) {
 ikVector ikVector_rotate(ikVector vector, ikVector angle) {
     ikVector r;
     ikVector k;
-    float a;
+    double a;
     int i;
     
     k.c[0] = 1.0;
