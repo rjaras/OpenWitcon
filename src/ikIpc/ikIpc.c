@@ -80,6 +80,7 @@ void ikIpc_step(ikIpc *self) {
     int i;
     ikVector rotations[3];
     ikVector pitchAxes[3];
+    double pitchMarginUp, pitchMarginDown;
     
     /* Transform rotating frame blade root moments to non-rotating frame and add them up */
     /* Also transform the rotating frame z axes to non-rotating frame*/
@@ -97,9 +98,29 @@ void ikIpc_step(ikIpc *self) {
         pitchAxes[i] = ikVector_rotate(pitchAxes[i], rotations[i]);
     }
     
+    /* calculate maximum pitch increment module */
+    pitchMarginUp = self->in.maximumPitch - self->in.collectivePitch;
+    pitchMarginUp = pitchMarginUp > 0.0 ? pitchMarginUp : 0.0;
+    pitchMarginDown = self->in.minimumPitch - self->in.collectivePitch;
+    pitchMarginDown = pitchMarginDown < 0.0 ? pitchMarginDown : 0.0;
+    self->priv.maxPitchIncrementMod = fabs(pitchMarginUp) < fabs(pitchMarginDown) ? fabs(pitchMarginUp) : fabs(pitchMarginDown);
+    self->priv.maxPitchIncrementMod = self->priv.maxPitchIncrementMod < self->in.maximumIndividualPitch ? self->priv.maxPitchIncrementMod : self->in.maximumIndividualPitch;
+    
+    /* figure out the limits for the My control loop */
+    self->priv.maxPitchZ = self->priv.maxPitchIncrementMod*self->priv.maxPitchIncrementMod - self->priv.pitchYcon*self->priv.pitchYcon;
+    self->priv.maxPitchZ  = self->priv.maxPitchZ > 0.0 ? self->priv.maxPitchZ : 0.0;
+    self->priv.maxPitchZ  = sqrt(self->priv.maxPitchZ);
+    
+    /* run My control loop */
+    self->priv.pitchZcon = ikConLoop_step(&(self->priv.conMy), self->in.demandedMy, self->priv.staticMoment.c[1], -self->priv.maxPitchZ, self->priv.maxPitchZ);
+    
+    /* figure out the limits for the Mz control loop */
+    self->priv.maxPitchY = self->priv.maxPitchIncrementMod*self->priv.maxPitchIncrementMod - self->priv.pitchZcon*self->priv.pitchZcon;
+    self->priv.maxPitchY  = self->priv.maxPitchY > 0.0 ? self->priv.maxPitchY : 0.0;
+    self->priv.maxPitchY  = sqrt(self->priv.maxPitchY);
+    
     /* Run My and Mz control loops */
-    self->priv.pitchYcon = ikConLoop_step(&(self->priv.conMz), self->in.demandedMz, self->priv.staticMoment.c[2], -self->in.maximumIndividualPitch, self->in.maximumIndividualPitch);
-    self->priv.pitchZcon = ikConLoop_step(&(self->priv.conMy), self->in.demandedMy, self->priv.staticMoment.c[1], -self->in.maximumIndividualPitch, self->in.maximumIndividualPitch);
+    self->priv.pitchYcon = ikConLoop_step(&(self->priv.conMz), self->in.demandedMz, self->priv.staticMoment.c[2], -self->priv.maxPitchY, self->priv.maxPitchY);
     
     /* add the external pitch actions */
     self->priv.staticPitch.c[0] = 0.0;
@@ -111,10 +132,7 @@ void ikIpc_step(ikIpc *self) {
     /* saturate. */
     for (i = 0; i < 3; i++) {
         self->priv.pitchDifferentials[i] = ikVector_dot(self->priv.staticPitch, pitchAxes[i]);
-        self->priv.aggregatePitch[i] = self->in.collectivePitch + self->priv.pitchDifferentials[i];
-        self->out.pitch[i] = self->priv.aggregatePitch[i];
-        self->out.pitch[i] = self->out.pitch[i] > self->in.minimumPitch ? self->out.pitch[i] : self->in.minimumPitch;
-        self->out.pitch[i] = self->out.pitch[i] < self->in.maximumPitch ? self->out.pitch[i] : self->in.maximumPitch;
+        self->out.pitch[i] = self->in.collectivePitch + self->priv.pitchDifferentials[i];
     }
 
 }
@@ -158,18 +176,6 @@ int ikIpc_getOutput(const ikIpc *self, double *output, const char *name) {
     }
     if (!strcmp(name, "pitch increment 3")) {
         *output = self->priv.pitchDifferentials[2];
-        return 0;
-    }
-    if (!strcmp(name, "aggregate pitch 1")) {
-        *output = self->priv.aggregatePitch[0];
-        return 0;
-    }
-    if (!strcmp(name, "aggregate pitch 2")) {
-        *output = self->priv.aggregatePitch[1];
-        return 0;
-    }
-    if (!strcmp(name, "aggregate pitch 3")) {
-        *output = self->priv.aggregatePitch[2];
         return 0;
     }
 

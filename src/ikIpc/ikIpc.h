@@ -83,7 +83,9 @@ extern "C" {
         double pitchYcon;
         double pitchZcon;
         ikVector staticPitch;
-        double aggregatePitch[3];
+        double maxPitchIncrementMod;
+        double maxPitchZ;
+        double maxPitchY;
     } ikIpcPrivate;
     /* @endcond */
     
