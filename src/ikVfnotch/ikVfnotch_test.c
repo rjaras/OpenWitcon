@@ -48,7 +48,7 @@ void verifyAttenuation(const char *testname, ikVfnotch *notch, double dT, double
     double PI = acos(-1);
     int i = 0;
     int n = (int) ceil(ncycles/dT/freq*2*PI);
-    double *output = malloc((n+1)*sizeof(double));
+    double *output = malloc(((unsigned)n+1)*sizeof(double));
     double aux;
     while (1) {
         output[i] = ikVfnotch_step(notch, sin(i*freq*dT));

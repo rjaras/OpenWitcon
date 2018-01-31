@@ -31,7 +31,6 @@ along with OpenWitcon. If not, see <http://www.gnu.org/licenses/>.
 #include "ikSensorDiagnoser.h"
 
 void ikSensorDiagnoser_initParams(ikSensorDiagnoserParams *params) {
-    int i;
     
     /* set default parameter values */
     params->nStepsToFault = 1;
@@ -63,7 +62,7 @@ int ikSensorDiagnoser_init(ikSensorDiagnoser *self, const ikSensorDiagnoserParam
 }
 
 void ikSensorDiagnoser_step(ikSensorDiagnoser *self, int ok[3], const double signals[3]) {
-    int i,j,k;
+    int i,j;
     int _ok[3] = {0,0,0};
     
     /* check tolerances */
@@ -74,10 +73,6 @@ void ikSensorDiagnoser_step(ikSensorDiagnoser *self, int ok[3], const double sig
             if (self->ok[i] && self->ok[j]) {
                 _ok[i] = 1;
                 _ok[j] = 1;
-            } else {
-                k = 3 - i - j;
-                if (self->tol > fabs(signals[i] - signals[k]) && self->ok[k]) _ok[i] = 1;
-                if (self->tol > fabs(signals[j] - signals[k]) && self->ok[k]) _ok[j] = 1;
             }
         }
     }

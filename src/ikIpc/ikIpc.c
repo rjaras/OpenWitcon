@@ -178,6 +178,18 @@ int ikIpc_getOutput(const ikIpc *self, double *output, const char *name) {
         *output = self->priv.pitchDifferentials[2];
         return 0;
     }
+    if (!strcmp(name, "maximum pitch increment module")) {
+        *output = self->priv.maxPitchIncrementMod;
+        return 0;
+    }
+    if (!strcmp(name, "maximum pitch y")) {
+        *output = self->priv.maxPitchY;
+        return 0;
+    }
+    if (!strcmp(name, "maximum pitch z")) {
+        *output = self->priv.maxPitchZ;
+        return 0;
+    }
 
     /* pick up the block names */
     sep = strstr(name, ">");

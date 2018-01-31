@@ -160,7 +160,7 @@ void testDefault() {
     if (ok[1]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 0 for sensor 1, but returned %d\n", ok[1]);
     if (ok[2]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 0 for sensor 2, but returned %d\n", ok[2]);
     
-    /* see that a faulty sensor can recover */
+    /* see that a faulty sensor cannot recover */
     ikSensorDiagnoser_initParams(&param);
     err = ikSensorDiagnoser_init(&sd, &param);
     if (err) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=init expected to return 0, but returned %d\n", err);
@@ -175,7 +175,7 @@ void testDefault() {
     signals[1] = 5.1;
     signals[2] = 5.2;
     ikSensorDiagnoser_step(&sd, ok, signals);
-    if (!ok[0]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 1 for sensor 0, but returned %d\n", ok[0]);
+    if (ok[0]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 0 for sensor 0, but returned %d\n", ok[0]);
     if (!ok[1]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 1 for sensor 1, but returned %d\n", ok[1]);
     if (!ok[2]) printf("%%TEST_FAILED%% time=0 testname=testDefault (ikSensorDiagnoser_test) message=step expected to return 1 for sensor 2, but returned %d\n", ok[2]);
     

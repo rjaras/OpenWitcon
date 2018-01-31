@@ -231,7 +231,7 @@ double ikLinCon_step(ikLinCon *self, double demand, double measurement) {
 }
 
 int ikLinCon_getOutput(const ikLinCon *self, double *output, const char *name) {
-    int blocklen;
+    size_t blocklen;
     int index;
     const char *separator;
     
@@ -285,7 +285,7 @@ int ikLinCon_getOutput(const ikLinCon *self, double *output, const char *name) {
             index = atoi(separator + 1);
         }
         /* truncate name to leave only the block name */
-        blocklen = separator - name;
+        blocklen = strcspn(name, ">");
         /* change error code */
         err = -2;
     }
