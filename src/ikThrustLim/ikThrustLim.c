@@ -23,27 +23,40 @@ along with OpenWitcon. If not, see <http://www.gnu.org/licenses/>.
  * @brief Class ikThrustLim implementation
  */
 
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "ikThrustLim.h"
 
-int ikThrustLim_init(ikThrustLim *self, const ikThrustLimParams *params) {
+char* ikThrustLim_init(ikThrustLim *self, const ikThrustLimParams *params) {
     const char* errStr = "";
+    char* outputErrorMessage = malloc(100 * sizeof(char));
 	
     /*pass parameters on*/
     self->rho = params->rho;
     self->R = params->R;
+    self->ctlambda2Max = params->ctlambda2Max;
+    self->ctlambda2Min = params->ctlambda2Min;
+    self->minPitchMaxChangeRate = params->minPitchMaxChangeRate;
+    self->samplingInterval = params->samplingInterval;
     
+    /*construct ct/lambda^2 surface*/
     errStr = ikSurf_newf(&(self->surfCtlambda2), params->ctlambda2SurfaceFileName);
-    if (strlen(errStr)) return -1;
+    if (strlen(errStr)) {
+        snprintf(outputErrorMessage, 100, "Error initializing ct/lambda^2 surface: %s", errStr);
+        return outputErrorMessage;
+    }
 
-    return 0;
+    return "";
 }
 
 void ikThrustLim_initParams(ikThrustLimParams *params) {
     params->rho = 1.0;
     params->R = 1.0;
     params->ctlambda2SurfaceFileName = "ctlambda2.bin";
+    params->ctlambda2Max = 1E3;
+    params->ctlambda2Min = -1E3;
 }
 
 double ikThrustLim_step(ikThrustLim *self, double tipSpeedRatio, double rotorSpeed, double maximumThrust) {
@@ -55,7 +68,25 @@ double ikThrustLim_step(ikThrustLim *self, double tipSpeedRatio, double rotorSpe
     self->ctlambda2 = 2 * maximumThrust * 1E3 / (self->rho * 3.1415926536 * self->R*self->R*self->R*self->R * rotorSpeed*rotorSpeed);
     x[0] = tipSpeedRatio;
     x[1] = self->ctlambda2;
-    self->minimumPitch = ikSurf_eval(self->surfCtlambda2, 1, x, 1);
+    double newMinimumPitch = ikSurf_eval(self->surfCtlambda2, 1, x, 1);
+    
+    // Limit the value of the minimum pitch
+    newMinimumPitch = (self->ctlambda2 > self->ctlambda2Max ? 0.0 : newMinimumPitch);
+    newMinimumPitch = (self->ctlambda2 < self->ctlambda2Min ? 0.0 : newMinimumPitch);
+    newMinimumPitch = (newMinimumPitch < 0.0 ? 0.0 : newMinimumPitch);
+    double minPitchChange = newMinimumPitch - self->minimumPitch;
+    if (minPitchChange > self->minPitchMaxChangeRate * self->samplingInterval) {
+        self->minimumPitch = self->minimumPitch + self->minPitchMaxChangeRate * self->samplingInterval;
+    } else if (minPitchChange < - self->minPitchMaxChangeRate * self->samplingInterval) {
+        self->minimumPitch = self->minimumPitch - self->minPitchMaxChangeRate * self->samplingInterval;
+    } else {
+        self->minimumPitch = newMinimumPitch;
+    }
+
+    // Limit the value for ctlambda2
+    self->ctlambda2 = (self->ctlambda2 > self->ctlambda2Max ? self->ctlambda2Max : self->ctlambda2);
+    self->ctlambda2 = (self->ctlambda2 < self->ctlambda2Min ? self->ctlambda2Min : self->ctlambda2);
+    
     return self->minimumPitch;
 }
 

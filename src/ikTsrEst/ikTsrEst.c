@@ -28,9 +28,10 @@ along with OpenWitcon. If not, see <http://www.gnu.org/licenses/>.
 
 #include "ikTsrEst.h"
 
-int ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params) {
+char* ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params) {
     int i, err;
 	const char* errStr = "";
+	char* outputErrorMessage = malloc(100 * sizeof(char));
 	
     /*allocate parameters for derivation*/
     ikTfListParams derParams;
@@ -40,20 +41,41 @@ int ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params) {
     self->J = params->J;
     self->rho = params->rho;
     self->R = params->R;
+    self->cplambda3Max = params->cplambda3Max;
+    self->cplambda3Min = params->cplambda3Min;
+    self->tipSpeedRatioMax = params->tipSpeedRatioMax;
 	
     /*initialise filters*/
     err = ikNotchList_init(&(self->rotorSpeedNotchFilters), &(params->notches));
-    if (err) return -1;
+	if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing rotor speed notch filters: %d", err);
+        return outputErrorMessage;
+    }
     err = ikNotchList_init(&(self->generatorTorqueNotchFilters), &(params->notches));
-    if (err) return -2;
-    err = ikNotchList_init(&(self->pitchAngleNotchFilters), &(params->notches));
-    if (err) return -3;
-    err = ikTfList_init(&(self->rotorSpeedLowPassFilter), &(params->lowPass));
-    if (err) return -4;
-    err = ikTfList_init(&(self->generatorTorqueLowPassFilter), &(params->lowPass));
-    if (err) return -5;
-    err = ikTfList_init(&(self->pitchAngleLowPassFilter), &(params->lowPass));
-    if (err) return -6;
+    if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing generator torque notch filters: %d", err);
+        return outputErrorMessage;
+    }
+	err = ikNotchList_init(&(self->pitchAngleNotchFilters), &(params->notches));
+    if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing pitch angle notch filters: %d", err);
+        return outputErrorMessage;
+    }
+	err = ikTfList_init(&(self->rotorSpeedLowPassFilter), &(params->lowPass));
+    if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing rotor speed low pass filter: %d", err);
+        return outputErrorMessage;
+    }
+	err = ikTfList_init(&(self->generatorTorqueLowPassFilter), &(params->lowPass));
+    if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing generator torque low pass filter: %d", err);
+        return outputErrorMessage;
+    }
+	err = ikTfList_init(&(self->pitchAngleLowPassFilter), &(params->lowPass));
+	if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing pitch angle low pass filter: %d", err);
+        return outputErrorMessage;
+    }
 
     /*add derivative to the low pass filter*/
     derParams = params->lowPass;
@@ -72,13 +94,19 @@ int ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params) {
 
     /*initialise derivative*/
     err = ikTfList_init(&(self->rotorSpeedDerivation), &(derParams));
-    if (err) return -7;
+	if (err) {
+        snprintf(outputErrorMessage, 100, "Error initializing rotor speed derivation tf: %d", err);
+        return outputErrorMessage;
+    }
 
     /*construct cp/lambda^3 surface*/
     errStr = ikSurf_newf(&(self->surfCplambda3), params->cplambda3SurfaceFileName);
-    if (strlen(errStr)) return -8;
+	if (strlen(errStr)) {
+        snprintf(outputErrorMessage, 100, "Error initializing cp/lambda^3 surface: %s", errStr);
+        return outputErrorMessage;
+    }
 	
-    return 0;
+	return "";
 }
 
 void ikTsrEst_initParams(ikTsrEstParams *params) {
@@ -88,6 +116,9 @@ void ikTsrEst_initParams(ikTsrEstParams *params) {
     params->R = 1.0;
     params->cplambda3SurfaceFileName = "cplambda3.bin";
     params->T = 0.01;
+    params->cplambda3Max = 1E3;
+    params->cplambda3Min = -1E3;
+    params->tipSpeedRatioMax = 50;
     
     ikNotchList_initParams(&(params->notches));
     ikTfList_initParams(&(params->lowPass));
@@ -108,9 +139,15 @@ double ikTsrEst_step(ikTsrEst *self, double generatorSpeed, double generatorTorq
     self->filteredGeneratorTorque = ikTfList_step(&(self->generatorTorqueLowPassFilter), aux) * 1E3; // kNm -> Nm
     self->aerodynamicTorque = self->J * self->rotorAcceleration + self->b * self->filteredGeneratorTorque;
     self->cplambda3 = 2 * self->aerodynamicTorque / (self->rho * 3.1415926536 * self->R*self->R*self->R*self->R*self->R * self->rotorSpeed*self->rotorSpeed);
+    //Set limit values for cplambda3
+    self->cplambda3 = (self->cplambda3 > self->cplambda3Max ? self->cplambda3Max : self->cplambda3);
+    self->cplambda3 = (self->cplambda3 < self->cplambda3Min ? self->cplambda3Min : self->cplambda3);
     x[0] = self->filteredPitchAngle;
     x[1] = self->cplambda3;
     self->tipSpeedRatio = ikSurf_eval(self->surfCplambda3, 0, x, 1);
+    //Set limit values for tip speed ratio
+    self->tipSpeedRatio = self->tipSpeedRatio < 0.0 ? 0.0 : self->tipSpeedRatio;
+    self->tipSpeedRatio = self->tipSpeedRatio > self->tipSpeedRatioMax ? self->tipSpeedRatioMax : self->tipSpeedRatio;
     return self->tipSpeedRatio;
 }
 

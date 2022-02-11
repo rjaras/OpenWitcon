@@ -74,6 +74,10 @@ extern "C" {
 	double ctlambda2;
 	double minimumPitch;
 	ikSurf *surfCtlambda2;  /**<surface giving Ct/lambda^2 as a function of lambda and beta*/
+	double ctlambda2Max;
+	double ctlambda2Min;
+	double minPitchMaxChangeRate;
+    double samplingInterval;
         /* @endcond */
     } ikThrustLim;
     
@@ -85,17 +89,21 @@ extern "C" {
 	double rho; /**<air density in kg/m^3*/
 	double R; /**<rotor radius in m*/
 	const char *ctlambda2SurfaceFileName; /**<name of a valid file for @link ikSurf_newf @endlink*/
+	double ctlambda2Max;
+	double ctlambda2Min;
+	double minPitchMaxChangeRate;
+    double samplingInterval;
     } ikThrustLimParams;
     
     /**
      * Initialise an instance
      * @param self instance
      * @param params initialisation parameters
-     * @return error code:
-     * @li 0: no error
-     * @li -1: Ctlambda2 surface initialisation error
+     * @return error message
+     * @li "": no error*
+     * @li "...": error message stating the failing submodule (ct/lambda^2 surface initialization error)
      */
-    int ikThrustLim_init(ikThrustLim *self, const ikThrustLimParams *params);
+    char* ikThrustLim_init(ikThrustLim *self, const ikThrustLimParams *params);
     
     /**
      * Initialise initialisation parameter structure

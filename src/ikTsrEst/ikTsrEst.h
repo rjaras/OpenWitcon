@@ -86,9 +86,12 @@ extern "C" {
 	double filteredPitchAngle;
 	double aerodynamicTorque;
 	double cplambda3;
-	double tipSpeedRatio;
-	ikSurf *surfCplambda3; /**<surface giving Cp/lambda^3 as a function of lambda and beta*/
-	ikNotchList rotorSpeedNotchFilters;
+    double cplambda3Max;
+    double cplambda3Min;
+    double tipSpeedRatio;
+    double tipSpeedRatioMax;
+    ikSurf *surfCplambda3; /**<surface giving Cp/lambda^3 as a function of lambda and beta*/
+    ikNotchList rotorSpeedNotchFilters;
 	ikNotchList generatorTorqueNotchFilters;
 	ikNotchList pitchAngleNotchFilters;
 	ikTfList rotorSpeedLowPassFilter;
@@ -108,8 +111,11 @@ extern "C" {
 	double rho; /**<air density in kg/m^3*/
 	double R; /**<rotor radius in m*/
 	double T; /**<time step in seconds*/
-	ikNotchListParams notches; /**<notch filter initialisation parameters*/
-	ikTfListParams lowPass; /**<low pass filter initialisation parameters*/
+    double cplambda3Max; /**<maximum value for the Cp/lambda^3 expression (helps analysis)*/
+    double cplambda3Min; /**<maximum value for the Cp/lambda^3 expression (helps analysis)*/
+    double tipSpeedRatioMax; /**<maximum value for the tip speed ratio (helps analysis)*/
+    ikNotchListParams notches; /**<notch filter initialisation parameters*/
+    ikTfListParams lowPass; /**<low pass filter initialisation parameters*/
 	const char *cplambda3SurfaceFileName; /**<name of a valid file for @link ikSurf_newf @endlink*/
     } ikTsrEstParams;
     
@@ -117,18 +123,11 @@ extern "C" {
      * Initialise an instance
      * @param self instance
      * @param params initialisation parameters
-     * @return error code:
-     * @li 0: no error
-     * @li -1: rotor speed notch filters initialisation error
-     * @li -2: generator torque notch filters initialisation error
-     * @li -3: pitch angle notch filters initialisation error
-     * @li -4: rotor speed low pass filter initialisation error
-     * @li -5: generator torque low filter initialisation error
-     * @li -6: pitch angle low filter initialisation error
-     * @li -7: rotor speed derivation transfer function initialisation error
-     * @li -8: Cplambda3 surface initialisation error
+     * @return error message:
+     * @li "": no error*
+     * @li "...": error message stating the failing submodule (rotor speed notch filters initialisation error, generator torque notch filters initialisation error, ...)
      */
-    int ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params);
+    char* ikTsrEst_init(ikTsrEst *self, const ikTsrEstParams *params);
     
     /**
      * Initialise initialisation parameter structure
