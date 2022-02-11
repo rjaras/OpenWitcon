@@ -39,6 +39,8 @@ void ikSlti_init(ikSlti *self) {
     }
     self->a[0] = 1.0;
     self->b[0] = 1.0;
+    self->suma = 1.0;
+    self->sumb = 1.0;
     self->inSat = 0;
     self->outSat = 0;
     self->inMin = 0.0;
@@ -53,10 +55,14 @@ int ikSlti_setParam(ikSlti *self, const double a[], const double b[]) {
     /*check a[0] is non-zero] */
     if (0.0 == a[0]) return -1;
     
-    /*copy a and b values */
+    /*copy a and b values and compute sums*/
+    self->suma = 0.0;
+    self->sumb = 0.0;
     for (i = 0; i < 3; i++) {
         self->a[i] = a[i];
         self->b[i] = b[i];
+        self->suma += a[i];
+        self->sumb += b[i];
     }
     return 0;
 }
@@ -139,8 +145,9 @@ int ikSlti_getOutSat(const ikSlti *self, double *min, double *max) {
 }
 
 double ikSlti_step(ikSlti *self, double input) {
-    /*move old values down the buffers */
     int i;
+    
+    /*move old values down the buffers */
     for (i = 2; i > 0; i--) {
         self->inBuff[i] = self->inBuff[i-1];
         self->outBuff[i] =self->outBuff[i-1];
@@ -164,10 +171,22 @@ double ikSlti_step(ikSlti *self, double input) {
     self->outBuff[0] = self->outBuff[0] / self->a[0];
     
     /*apply output saturation */
-    if ((-1 == self->outSat) || (2 == self->outSat))
-        if (self->outMin > self->outBuff[0]) self->outBuff[0] = self->outMin;
-    if ((1 == self->outSat) || (2 == self->outSat))
-        if (self->outMax < self->outBuff[0]) self->outBuff[0] = self->outMax;
+    if ((-1 == self->outSat) || (2 == self->outSat)) {
+        if (self->outMin > self->outBuff[0]) {
+            for (i = 0; i < 3; i++) {
+                self->outBuff[i] = self->outMin;
+                if (0.0 != self->sumb) self->inBuff[i] = self->outMin/self->sumb*self->suma;
+            }
+        }
+    }
+    if ((1 == self->outSat) || (2 == self->outSat)) {
+        if (self->outMax < self->outBuff[0]) {
+            for (i = 0; i < 3; i++) {
+                self->outBuff[i] = self->outMax;
+                if (0.0 != self->sumb) self->inBuff[i] = self->outMax/self->sumb*self->suma;
+	    }
+	}
+    }
     
     /*return new output */
     return self->outBuff[0];

@@ -305,21 +305,25 @@ void testSaturation() {
     /*see that output saturation works */
     err = ikSlti_setOutSat(&sys, 2, 2.0, 4.0);
     if (0 != err) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=setOutSat was expected to return 0, but returned %d\n", err);
-    ikSlti_step(&sys, 1.0);
-    ikSlti_step(&sys, 1.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
     ikSlti_step(&sys, 1.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
         if (fabs(2.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==2.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+        if (fabs(2.0-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==2.0, but instead inBuff[%d]==%f\n", i, i, inBuff[i]);
     }
     double out = ikSlti_getOutput(&sys);
     if (fabs(2.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 2.0, but returned%f\n", out);
-    ikSlti_step(&sys, 8.0);
-    ikSlti_step(&sys, 8.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
     ikSlti_step(&sys, 8.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
         if (fabs(4.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==4.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+        if (fabs(4.0-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==4.0, but instead inBuff[%d]==%f\n", i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(4.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 4.0, but returned%f\n", out);
@@ -327,21 +331,24 @@ void testSaturation() {
     /*see that just minimum output saturation works */
     err = ikSlti_setOutSat(&sys, -1, 2.0, 4.0);
     if (0 != err) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=setOutSat was expected to return 0, but returned %d\n", err);
-    ikSlti_step(&sys, 1.0);
-    ikSlti_step(&sys, 1.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
     ikSlti_step(&sys, 1.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
         if (fabs(2.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==2.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+        if (fabs(2.0-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==2.0, but instead inBuff[%d]==%f\n", i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(2.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 2.0, but returned%f\n", out);
-    ikSlti_step(&sys, 8.0);
-    ikSlti_step(&sys, 8.0);
+    ikSlti_step(&sys, 6.0);
+    ikSlti_step(&sys, 7.0);
     ikSlti_step(&sys, 8.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
-        if (fabs(8.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==8.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+      if (fabs(8.0-(double)i-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==%f, but instead outBuff[%d]==%f\n", i, 8.0-(double)i, i, outBuff[i]);
+      if (fabs(8.0-(double)i-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==%f, but instead inBuff[%d]==%f\n", i, 8.0-(double)i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(8.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 8.0, but returned%f\n", out);
@@ -349,21 +356,24 @@ void testSaturation() {
     /*see that just maximum output saturation works */
     err = ikSlti_setOutSat(&sys, 1, 2.0, 4.0);
     if (0 != err) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=setOutSat was expected to return 0, but returned %d\n", err);
-    ikSlti_step(&sys, 1.0);
-    ikSlti_step(&sys, 1.0);
+    ikSlti_step(&sys, -1.0);
+    ikSlti_step(&sys, 0.0);
     ikSlti_step(&sys, 1.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
-        if (fabs(1.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==1.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+      if (fabs(1.0-(double)i-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==%f, but instead outBuff[%d]==%f\n", i, 1.0-(double)i, i, outBuff[i]);
+      if (fabs(1.0-(double)i-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==%f, but instead inBuff[%d]==%f\n", i, 1.0-(double)i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(1.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 1.0, but returned%f\n", out);
-    ikSlti_step(&sys, 8.0);
-    ikSlti_step(&sys, 8.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
+    ikSlti_step(&sys, 3.0);
     ikSlti_step(&sys, 8.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
         if (fabs(4.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==4.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+        if (fabs(4.0-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==4.0, but instead inBuff[%d]==%f\n", i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(4.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 4.0, but returned%f\n", out);
@@ -371,21 +381,23 @@ void testSaturation() {
     /*see that output saturation is disabled properly */
     err = ikSlti_setOutSat(&sys, 0, 2.0, 4.0);
     if (0 != err) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=setOutSat was expected to return 0, but returned %d\n", err);
-    ikSlti_step(&sys, 1.0);
-    ikSlti_step(&sys, 1.0);
+    ikSlti_step(&sys, -1.0);
+    ikSlti_step(&sys, 0.0);
     ikSlti_step(&sys, 1.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
-        if (fabs(1.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==1.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+      if (fabs(1.0-(double)i-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==%f, but instead outBuff[%d]==%f\n", i, 1.0-(double)i, i, outBuff[i]);
+      if (fabs(1.0-(double)i-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==%f, but instead inBuff[%d]==%f\n", i, 1.0-(double)i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(1.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 1.0, but returned%f\n", out);
-    ikSlti_step(&sys, 8.0);
-    ikSlti_step(&sys, 8.0);
+    ikSlti_step(&sys, 6.0);
+    ikSlti_step(&sys, 7.0);
     ikSlti_step(&sys, 8.0);
     ikSlti_getBuff(&sys, inBuff, outBuff);
     for (i = 0; i < 3; i++) {
-        if (fabs(8.0-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==8.0, but instead outBuff[%d]==%f\n", i, i, outBuff[i]);
+      if (fabs(8.0-(double)i-outBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected outBuff[%d]==%f, but instead outBuff[%d]==%f\n", i, 8.0-(double)i, i, outBuff[i]);
+      if (fabs(8.0-(double)i-inBuff[i]) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=expected inBuff[%d]==%f, but instead inBuff[%d]==%f\n", i, 8.0-(double)i, i, inBuff[i]);
     }
     out = ikSlti_getOutput(&sys);
     if (fabs(8.0-out) > 1e-9) printf("%%TEST_FAILED%% time=0 testname=saturation (ikSlti_test) message=getOutput expected to return 8.0, but returned%f\n", out);
@@ -441,6 +453,155 @@ void testSetOutSatErrors() {
 
 }
 
+/**
+ * Test that output saturation propagates properly to input buffer.
+ */
+void testPropagation() {
+    printf("ikSlti_test propagation\n");
+    /*declare instance */
+    ikSlti sys;
+
+    /*declare parameters */
+    double a[3], b[3];
+
+    /*see that a positive gain propagates from outmax to inBuff */
+    ikSlti_init(&sys);
+    a[0] = 1.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+    b[0] = 2.0;
+    b[1] = 0.0;
+    b[2] = 0.0;
+    int err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, 1, 0.0, 100.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, 150.0);
+    double inBuff[3], outBuff[3];
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] - 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be 100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] - 50.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be 50.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a positive gain propagates from outmin to inBuff */
+    ikSlti_init(&sys);
+    a[0] = 1.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+    b[0] = 2.0;
+    b[1] = 0.0;
+    b[2] = 0.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, -1, -100.0, 0.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, -150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] + 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be -100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] + 50.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be -50.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a negative gain propagates from outmax to inBuff */
+    ikSlti_init(&sys);
+    a[0] = -1.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+    b[0] = 2.0;
+    b[1] = 0.0;
+    b[2] = 0.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, 1, 0.0, 100.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, -150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] - 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be 100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] + 50.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be -50.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a negative gain propagates from outmin to inBuff */
+    ikSlti_init(&sys);
+    a[0] = -1.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+    b[0] = 2.0;
+    b[1] = 0.0;
+    b[2] = 0.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, -1, -100.0, 0.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, 150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] + 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be -100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] - 50.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be 50.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a second order transfer function propagates from outmax to inBuff */
+    ikSlti_init(&sys);
+    a[0] = 0.5;
+    a[1] = 0.2;
+    a[2] = 0.3;
+    b[0] = 7.0;
+    b[1] = 2.0;
+    b[2] = -4.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, 1, 0.0, 100.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, 150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] - 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be 100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] - 20) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be 20.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a second order transfer function propagates from outmin to inBuff */
+    ikSlti_init(&sys);
+    a[0] = 0.2;
+    a[1] = 0.3;
+    a[2] = 0.4;
+    b[0] = 4.0;
+    b[1] = 3.0;
+    b[2] = 2.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, -1, -100.0, 0.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, -150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] + 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be -100.0, but is %f\n", i, outBuff[i]);
+	if (fabs(inBuff[i] + 10.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[%i] expected to be -10.0, but is %f\n", i, inBuff[i]);
+    }
+
+    /*see that a zero-gain transfer function doesn't propagate from outmax to inBuff */
+    ikSlti_init(&sys);
+    a[0] = 1.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+    b[0] = 2.0;
+    b[1] = -1.0;
+    b[2] = -1.0;
+    err = ikSlti_setParam(&sys, a, b);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setParam expected to return 0, but returned %d\n", err);
+    err = ikSlti_setOutSat(&sys, 1, 0.0, 100.0);
+    if (err) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=setOutSat expected to return 0, but returned %d\n", err);
+    ikSlti_step(&sys, 150.0);
+    ikSlti_getBuff(&sys, inBuff, outBuff);
+    for (int i = 0; i < 3; i++) {
+	if (fabs(outBuff[i] - 100.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=outBuff[%i] expected to be 100.0, but is %f\n", i, outBuff[i]);
+    }
+    if (fabs(inBuff[0] - 150.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[0] expected to be 150.0, but is %f\n", inBuff[0]);
+    if (fabs(inBuff[1] - 0.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[1] expected to be 0.0, but is %f\n", inBuff[1]);
+    if (fabs(inBuff[2] - 0.0) > 1.0e-9) printf("%%TEST_FAILED%% time=0 testname=propagation (ikSlti_test) message=inBuff[2] expected to be 0.0, but is %f\n", inBuff[2]);
+
+}
+
 int main(int argc, char** argv) {
     printf("%%SUITE_STARTING%% ikSlti_test\n");
     printf("%%SUITE_STARTED%%\n");
@@ -472,6 +633,10 @@ int main(int argc, char** argv) {
     printf("%%TEST_STARTED%% setOutSat_errors (ikSlti_test)\n");
     testSetOutSatErrors();
     printf("%%TEST_FINISHED%% time=0 setOutSat_errors (ikSlti_test) \n");
+
+    printf("%%TEST_STARTED%% propagation (ikSlti_test)\n");
+    testPropagation();
+    printf("%%TEST_FINISHED%% time=0 propagation (ikSlti_test) \n");
 
     printf("%%SUITE_FINISHED%% time=0\n");
 

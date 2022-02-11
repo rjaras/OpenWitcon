@@ -76,6 +76,8 @@ extern "C" {
         double outBuff[3]; /*output buffer */
         double a[3]; /*denominator parameters */
         double b[3]; /*numerator parameters */
+        double suma; /*sum of a */
+        double sumb; /*sum of b */
         int inSat; /*input saturation status flag */
         int outSat; /*output saturation status flag */
         double inMax; /*upper saturation limit for input */
